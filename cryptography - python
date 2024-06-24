@@ -1,0 +1,223 @@
+import tkinter
+import tkinter.ttk
+from tkinter import Tk, Button, Text, filedialog, StringVar, Entry, Label, ttk
+from PIL import Image, ImageTk
+import numpy as np
+import cv2
+class ImageCrypt:
+    def __init__(self, master):
+        self.master = master
+        self.ref_path = ""
+        self.crypt_path = ""
+        self.text_path = ""
+        self.stepP1_var = StringVar()
+        self.stepP1_var.set("Введите значение")
+
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
+        self.style.configure('st_b.TButton',
+                                    font=('Console', 10, 'bold'),
+                                    background='#66A3D2',
+                                    foreground='#080E73',
+                                    bordercolor = "#2F3485",
+                                    lightcolor='#7277D8',
+                                    darkcolor='#7277D8')
+        self.style.map('st_b.TButton',
+                              background=[('active', '#6D89D5')],
+                              foreground=[('active', '#111111')],
+                              bordercolor=[('active', '#61D89F')])
+
+        self.back_text = Label(
+                    text='Для шифрования использовать по очереди: "Загрузить исходную фотографию", "Загрузить текст", "Зашифровать текст". Для расшифровки требуется как исходная фотография, так и зашифрованная, а также код-значение (шаг пикселя), который выдается при шифровании.',
+                    font=('Times New Roman', 9),
+                    foreground='#122533',
+                    width=64,
+                    wraplength=450,
+                    justify='left',
+                    background='#d4e6f2')
+        self.back_text.place(x =25 ,y =420, height = 65)
+
+        self.load_ref_button = ttk.Button(master,
+                    text="Загрузить исходную фотографию",
+                    style = 'st_b.TButton',
+                    command=self.load_ref)
+        self.load_ref_button.place(x = 25 , y = 10, width= 250, height=35)
+
+        self.load_crypt_text_button = ttk.Button(master,
+                    text="Загрузить текст",
+                    style='st_b.TButton',
+                    command=self.load_crypt_text)
+        self.load_crypt_text_button.place(x = 25 ,y = 50,width = 250, height=35)
+
+        self.load_crypt_button = ttk.Button(master,
+                    text="Загрузить зашифров. изображение",
+                    style = 'st_b.TButton',
+                    command=self.load_crypt)
+        self.load_crypt_button.place(x = 25 ,y = 90, width = 250,height=35)
+
+        self.encrypt_button = ttk.Button(master,
+                     text="Зашифровать текст",
+                     style = 'st_b.TButton',
+                     command=self.encrypt)
+        self.encrypt_button.place(x= 300, y = 10, width = 175,height=35)
+
+        self.decrypt_button = ttk.Button(master,
+                     text="Расшифровать",
+                     style = 'st_b.TButton',
+                     command=self.decrypt)
+        self.decrypt_button.place(x= 300, y = 90, width = 175,height=35)
+
+        self.empty_entry = 'Введите значение'
+        self.stepP1_var = StringVar(value=self.empty_entry)
+
+        # ввод                            ------------------------------
+
+        def erase(event=None):
+            if self.stepP1_entry.get() == self.empty_entry:
+                self.stepP1_entry.delete(0, 'end')
+
+        def add(event=None):
+            if self.stepP1_entry.get() == '':
+                self.stepP1_entry.insert(0, self.empty_entry)
+
+        self.stepP1_entry = Entry(master,
+                    font='Console 10 bold',
+                    background='#d4e6f2',
+                    justify='center',
+                    fg='#122533',
+                    textvariable=self.stepP1_var)
+        self.stepP1_entry.place(x= 300, y = 50, width = 175, height = 35)
+
+        self.stepP1_entry.bind('<FocusIn>', erase)
+        self.stepP1_entry.bind('<FocusOut>', add)
+
+        #  ввод - конец                   ------------------------------
+
+        self.decrypt_text = Text(master,
+                     background='#d4e6f2',
+                     foreground='#122533')
+        self.decrypt_text.pack(padx=20, pady=20, anchor = 's')
+        self.decrypt_text.place(x =25,y = 135 ,h=275,w=450)
+
+
+        self.decrypt_text_var = StringVar()
+        self.decrypt_text_var.trace_add("write", self.update_decrypt_text)
+        self.decrypt_text_var.set("")
+
+    def load_ref(self):
+        self.ref_path = filedialog.askopenfilename()
+
+    def load_crypt(self):
+        self.crypt_path = filedialog.askopenfilename()
+
+    def load_crypt_text(self):
+        self.text_path = filedialog.askopenfilename()
+
+    def encrypt(self):
+        global PS
+        if len(self.ref_path) != 0 and len(self.text_path) != 0:
+            image = Image.open(self.ref_path)
+            imageCrypt = np.array(image)
+            print(imageCrypt[0,0])
+            with open(self.text_path, 'r', encoding='utf-8') as file:
+                lines = file.readlines()
+            '''lines= lines[0]
+            print(lines'''
+            imgSize = imageCrypt.shape[0] * imageCrypt.shape[1]
+            print('imgSize',imgSize)
+            textSize = sum(len(line) for line in lines)
+            if textSize ==  0 or textSize>=imgSize:
+                return
+            pixStep = (imgSize // textSize)
+            PS = pixStep
+            print('textSize',textSize)
+            thisPix = 1
+            imageCrypt[0] += pixStep
+            for line in lines:
+                line=' '+line
+                for char in line:
+                    thisChar = ord(char)
+                    print('thisChar',thisChar)
+                    if thisChar > 1000:
+                        thisChar -= 800
+                    if thisChar > pixStep:
+                        whole = thisChar // (pixStep - 1)
+                        left = thisChar % (pixStep - 1)
+                        print(whole)
+                        print(left)
+                        for k in range(pixStep - 1):
+                            row, col = divmod(thisPix + k, imageCrypt.shape[1])
+                            imageCrypt[row, col] += whole
+                        row, col = divmod(thisPix + pixStep - 1, imageCrypt.shape[1])
+                        print(row,col)
+                        imageCrypt[row, col] += left
+                    else:
+                        for k in range(thisChar):
+                            row, col = divmod(thisPix + k, imageCrypt.shape[1])
+                            print('2) row',row,'col', col)
+                            print('1 imagecrypt r/c', imageCrypt[row, col])
+                            imageCrypt[row, col] += 1
+                            '''print('2 imagecrypt r/c', imageCrypt[row,col])'''
+                    thisPix += pixStep
+                    if thisPix + pixStep > imgSize:
+                        break
+            imageCrypt_rgb = cv2.cvtColor(imageCrypt, cv2.COLOR_BGR2RGB)
+            cv2.imwrite("crypt_image.bmp", imageCrypt_rgb)
+
+            self.decrypt_text_var.set(f"Шаг пикселя (код-значение) - {PS}")
+            self.decrypt_text.delete(1.0, "end")
+            self.decrypt_text.insert("end", self.decrypt_text_var.get())
+        else:
+            print("not selected")
+
+    def decrypt(self):
+        if len(self.ref_path) != 0 and len(self.crypt_path) != 0:
+            image = Image.open(self.ref_path)
+            imageRef = np.array(image)
+            image = Image.open(self.crypt_path)
+            imageCrypt = np.array(image)
+
+            imgSize = imageCrypt.shape[0] * imageCrypt.shape[1]
+            print('decrypt-imgSize',imgSize)
+            decryptText = ""
+            thisPix = 1
+            pixStep = int(self.stepP1_var.get())
+            print('decrypt-pixStep',pixStep)
+            print(imageCrypt)
+            while True:
+                thisChar = 0
+                for i in range(pixStep):
+                    row, col = divmod(thisPix + i, imageCrypt.shape[1])
+                    thisChar += imageCrypt[row, col, 1] - imageRef[row, col, 1]
+                if thisChar == 0:
+                    break
+                if thisChar > 200:
+                    thisChar += 800
+                decryptText += chr(thisChar)
+                thisPix += pixStep
+                if thisPix + pixStep > imgSize:
+                    break
+            self.decrypt_text_var.set(decryptText[1:])
+            with open("decrypt_text.txt", "w",encoding='utf-8') as file:
+                file.write(decryptText[0:])
+        else:
+            print("not selected")
+
+    def update_decrypt_text(self, *args):
+        self.decrypt_text.delete(1.0, "end")
+        self.decrypt_text.insert("end", self.decrypt_text_var.get())
+
+def main():
+    root = Tk()
+    my_gui = ImageCrypt(root)
+    root.geometry('500x500+710+290')
+    icon_photo = tkinter.PhotoImage(file='icon-1024x1024.png')
+    root.iconphoto(False,icon_photo)
+    root.maxsize(660,700)
+    root.minsize(500,500)
+    root.attributes("-alpha", 0.98)
+    root.config(bg='#6D89D5')
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
